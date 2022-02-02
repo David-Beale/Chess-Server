@@ -1,5 +1,6 @@
 const { Server } = require("socket.io");
-const crypto = require("crypto");
+const GameManager = require("./GameManager");
+const games = new GameManager();
 
 const io = new Server(4000, {
   cors: {
@@ -7,60 +8,51 @@ const io = new Server(4000, {
   },
 });
 
-const activeGames = {};
-const randomId = () => {
-  let gameId;
-  do {
-    gameId = crypto.randomBytes(4).toString("hex");
-  } while (activeGames[gameId]);
-
-  return gameId;
-};
-const flipColor = (color) => {
-  return color === "white" ? "black" : "white";
-};
 io.on("connection", (socket) => {
   socket.on("new game", (color) => {
     if (socket.gameId) {
-      delete activeGames[socket.gameId];
+      games.removeGame(socket.gameId);
     }
-    const gameId = randomId();
+    const gameId = games.newGame(color);
     socket.gameId = gameId;
     socket.join(gameId);
     socket.color = color;
-    activeGames[gameId] = { player1Color: color, players: 1, turn: "white" };
     io.to(gameId).emit("game id", gameId);
   });
 
   socket.on("join game", (gameId) => {
-    socket.gameId = gameId;
-    socket.join(gameId);
-    if (!activeGames[gameId] || activeGames[gameId].players === 2) {
+    const { error, color } = games.checkForGame(gameId);
+    if (error) {
       io.to(gameId).emit("error joining game");
       return;
     }
-    activeGames[gameId].players++;
-    const { player1Color } = activeGames[gameId];
-    const color = flipColor(player1Color);
+
+    socket.join(gameId);
+    socket.gameId = gameId;
     socket.color = color;
     io.to(gameId).emit("player connected", color);
   });
 
   socket.on("move", (payload) => {
-    const { gameId } = socket;
-    const { turn } = activeGames[gameId];
-    if (socket.color !== turn) return;
-    activeGames[gameId].turn = flipColor(activeGames[gameId].turn);
+    const { gameId, color } = socket;
+    const { error } = games.updateTurn(gameId, color);
+    if (error) return;
 
     socket.to(gameId).emit("move", payload);
   });
 
   socket.on("disconnect", () => {
-    const { gameId } = socket;
-    if (activeGames[gameId]) {
-      activeGames[gameId].players--;
-      if (!activeGames[gameId].players) delete activeGames[gameId];
-      else socket.to(gameId).emit("player disconnected");
-    }
+    console.log("disconnect");
+    const gameId = socket.gameId;
+    games.disconnect(gameId);
+    socket.to(gameId).emit("player disconnected", socket.id);
+  });
+  socket.on("leave", () => {
+    console.log("leave");
+    const gameId = socket.gameId;
+    socket.gameId = null;
+    socket.leave(gameId);
+    games.disconnect(socket.gameId);
+    socket.to(gameId).emit("player disconnected", socket.id);
   });
 });
