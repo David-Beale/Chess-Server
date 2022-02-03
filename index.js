@@ -4,7 +4,7 @@ const games = new GameManager();
 
 const io = new Server(4000, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: "https://david-beale.github.io",
   },
 });
 
