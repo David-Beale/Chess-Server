@@ -2,10 +2,9 @@ const { Server } = require("socket.io");
 const GameManager = require("./GameManager");
 const games = new GameManager();
 
-const io = new Server(4000, {
+const io = new Server(process.env.PORT || 5000, {
   cors: {
-    // origin: "https://david-beale.github.io",
-    origin: "*",
+    origin: "https://david-beale.github.io",
   },
 });
 
