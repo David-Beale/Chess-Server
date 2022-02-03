@@ -23,7 +23,7 @@ io.on("connection", (socket) => {
   socket.on("join game", (gameId) => {
     const { error, color } = games.checkForGame(gameId);
     if (error) {
-      io.to(gameId).emit("error joining game");
+      socket.emit("error joining game");
       return;
     }
 
@@ -42,17 +42,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("disconnect");
     const gameId = socket.gameId;
     games.disconnect(gameId);
-    socket.to(gameId).emit("player disconnected", socket.id);
-  });
-  socket.on("leave", () => {
-    console.log("leave");
-    const gameId = socket.gameId;
-    socket.gameId = null;
-    socket.leave(gameId);
-    games.disconnect(socket.gameId);
     socket.to(gameId).emit("player disconnected", socket.id);
   });
 });
